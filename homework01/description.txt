@@ -1,0 +1,14 @@
+This file contains observed daily 8-hr maximum ozone concentration as measured by monitors maintained by the U.S. Environmental Protection Agency (EPA) on August 1, 2001 in parts per billions (ppb). The file also reports the predicted daily 8-hr maximum ozone concentration that an air quality model run at EPA (CMAQ) predicts at the same location of the monitor.
+More information about CMAQ can be found here: http://www.epa.gov/AMD/Research/RIA/cmaq.html.
+
+
+
+The variables in the file are: 
+
+longitude: longitude of monitor
+latitude: latitude of monitor
+obs: observed ozone concentration at monitor location reported in parts per billion (ppb).
+CMAQ: predicted ozone concentration at monitor location  produced by an air quality model, also reported in parts per billion (ppb).
+
+
+The file contains a header line.
