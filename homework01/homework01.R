@@ -6,6 +6,7 @@ library(ggmap)
 library(maps)
 library(mapdata)
 library(akima)
+library(fields)
 data <- read_table2("data.txt")
 colnames(data) <- c("long","lat","obs","CMAQ")
 
@@ -26,8 +27,28 @@ ggplot() +
   xlab("Longitude") +
   ylab("Latitude") +
   scale_color_gradient(name = "Observation Value") +
-  coord_cartesian(xlim = c(-105,-65), ylim = c(25,50)) +
-  theme_bw()
+  coord_cartesian(xlim = c(-105,-65), ylim = c(25,50)) 
+  
 
-#
-interp(long, lat, obs)
+# Plot the interpolated surface for the observed ozone
+# concentration and add contour lines to the plot.
+source("heatmap.R")
+surf.ozone <- heatmap(data$long, data$lat, data$obs)
+ggplot(surf.ozone, aes(x=lon,y=lat)) +
+  geom_polygon(data = states,
+               aes(x=long, y=lat, group=group),
+               fill = "white", color = "black") +
+  geom_raster(aes(fill = obs), interpolate = T) +
+  geom_contour(aes(z = obs), color = "black") +
+  geom_polygon(data = usa,
+               aes(x=long, y=lat, group=group),
+               fill = NA, color = "black") +
+  geom_polygon(data = states,
+               aes(x=long, y=lat, group=group),
+               fill = NA, color = "black") +
+  ggtitle("Ozone Concentrations in the United States") +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  scale_color_gradient(name = "Observation Value") +
+  coord_cartesian(xlim = c(-105,-65), ylim = c(25,50)) +
+  scale_fill_gradient(na.value = NA, low = "yellow", high = "red")
