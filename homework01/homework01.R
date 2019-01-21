@@ -24,6 +24,7 @@ ggplot() +
   geom_point(data = data,
              aes(x=long, y = lat, color = obs)) +
   ggtitle("Ozone Concentrations in the United States") +
+  theme(plot.title = element_text(hjust = 0.5)) +
   xlab("Longitude") +
   ylab("Latitude") +
   scale_color_gradient(name = "Observation Value") +
@@ -47,8 +48,8 @@ ggplot(surf.ozone, aes(x=lon,y=lat)) +
                aes(x=long, y=lat, group=group),
                fill = NA, color = "black") +
   ggtitle("Ozone Concentrations in the United States") +
+  theme(plot.title = element_text(hjust = 0.5)) +
   xlab("Longitude") +
   ylab("Latitude") +
-  scale_color_gradient(name = "Observation Value") +
   coord_cartesian(xlim = c(-105,-65), ylim = c(25,50)) +
-  scale_fill_gradient(na.value = NA, low = "yellow", high = "red")
+  scale_fill_gradient(na.value = NA, low = "yellow", high = "red", name = "Observation Value")
