@@ -120,6 +120,108 @@ plot(dir.N$dist,dir.N$gamma,col="black",type="p",pch=20,xlab="Distance",ylab="Se
 plot(dir.NW$dist,dir.NW$gamma,col="black",type="p",pch=20,xlab="Distance",ylab="Semivariance",
      main = "NW-SE Empirical Directional Variogram", ylim=c(0,300))
 
-exp_var <- fit.variogram(emp_var,vgm(psill=50,"Mat",1000,100),fit.method=2)
+# Fit Exponential Semi-Variogram
+exp_var <- fit.variogram(emp_var,vgm(psill=150,"Exp",500,100),fit.method=2)
 exp_var
-plot(emp_var, exp_var)
+plot(emp_var, exp_var, main = "Exponential Semi-Variogram")
+# Fit Gaussian Semi-Variogram
+gau_var <- fit.variogram(emp_var,vgm(psill=150,"Gau",500,100),fit.method=2)
+gau_var
+plot(emp_var, gau_var, main = "Gaussian Semi-Variogram")
+# Fit Spherical Semi-Variogram
+sph_var <- fit.variogram(emp_var,vgm(psill=150,"Sph",500,100),fit.method=2)
+sph_var
+plot(emp_var, sph_var, main = "Spherical Semi-Variogram")
+# Fit Matern Semi-Variogram
+mat_var <- fit.variogram(emp_var,vgm(psill=150,"Mat",500,100,1.5),fit.method=2)
+mat_var
+plot(emp_var, mat_var, main = "Matern Semi-Variogram")
+
+# WSS for Exponential
+exp.variog <- function(sigma2,phi,tau2,dist){
+  n <- length(dist)
+  exp.variog.vec <- rep(0,n)
+  for(i in 1:n){
+    exp.variog.vec[i] <- tau2+(sigma2*(1-exp(-dist[i]/phi)))
+  }
+  return(exp.variog.vec)
+}
+
+sigma2.exp <- exp_var$psill[2]
+phi.exp <- exp_var$range[2]
+tau2.exp <- exp_var$psill[1]
+dist.vec <- emp_var$dist
+
+exp.variog.2 <- exp.variog(sigma2.exp,phi.exp,tau2.exp,dist.vec)
+weights.exp <- emp_var$np/((exp.variog.2)^2)
+squared.diff.exp <- (emp_var$gamma-exp.variog.2)^2
+wss.exp <- sum(weights.exp*squared.diff.exp)
+wss.exp
+
+# WSS for Gaussian
+gau.variog <- function(sigma2,phi,tau2,dist){
+  n <- length(dist)
+  gau.variog.vec <- rep(0,n)
+  for(i in 1:n){
+    gau.variog.vec[i] <- tau2+(sigma2*(1-exp(-(dist[i]/phi)^2)))
+  }
+  return(gau.variog.vec)
+}
+
+sigma2.gau <- gau_var$psill[2]
+phi.gau <- gau_var$range[2]
+tau2.gau <- gau_var$psill[1]
+dist.vec <- emp_var$dist
+
+gau.variog.2 <- gau.variog(sigma2.gau,phi.gau,tau2.gau,dist.vec)
+weights.gau <- emp_var$np/((gau.variog.2)^2)
+squared.diff.gau <- (emp_var$gamma-gau.variog.2)^2
+wss.gau <- sum(weights.gau*squared.diff.gau)
+wss.gau
+
+# WSS for Spherical
+sph.variog <- function(sigma2,phi,tau2,dist){
+  n <- length(dist)
+  sph.variog.vec <- rep(0,n)
+  for(i in 1:n){
+    if(dist[i] < phi){
+      sph.variog.vec[i] <- tau2+(sigma2*(((3*dist[i])/(2*phi))-((dist[i]^3)/(2*(phi^3)))))
+    }
+    if(dist[i] >= phi){
+      sph.variog.vec[i] <- tau2+sigma2	
+    }
+  }
+  return(sph.variog.vec)
+}
+
+sigma2.sph <- sph_var$psill[2]
+phi.sph <- sph_var$range[2]
+tau2.sph <- sph_var$psill[1]
+dist.vec <- emp_var$dist
+
+sph.variog.2 <- sph.variog(sigma2.sph,phi.sph,tau2.sph,dist.vec)
+weights.sph <- emp_var$np/((sph.variog.2)^2)
+squared.diff.sph <- (emp_var$gamma-sph.variog.2)^2
+wss.sph <- sum(weights.sph*squared.diff.sph)
+wss.sph
+
+# WSS for Matern
+mat.variog <- function(sigma2,phi,tau2,dist){
+  n <- length(dist)
+  mat.variog.vec <- rep(0,n)
+  for(i in 1:n){
+    mat.variog.vec[i] <- tau2+(sigma2*(1-(1+dist[i]*phi)*exp(-dist[i]*phi)))
+  }
+  return(mat.variog.vec)
+}
+
+sigma2.mat <- mat_var$psill[2]
+phi.mat <- mat_var$range[2]
+tau2.mat <- mat_var$psill[1]
+dist.vec <- emp_var$dist
+
+mat.variog.2 <- mat.variog(sigma2.mat,phi.mat,tau2.mat,dist.vec)
+weights.mat <- emp_var$np/((mat.variog.2)^2)
+squared.diff.mat <- (emp_var$gamma-mat.variog.2)^2
+wss.mat <- sum(weights.mat*squared.diff.mat)
+wss.mat
