@@ -165,3 +165,107 @@ ggplot() +
   xlab("Easting (km)") +
   ylab("Northing (km)") +
   scale_color_gradient(name = "Number of Cases")
+
+# Fit Poisson Log-Linear Model
+mod02 <- glm(data = nyleuk,
+             cases ~ homeowners+over65+Avg.inv.dist.TCEs,
+             family = "poisson")
+summary(mod02)
+
+
+nyleuk$cases[nyleuk$cases == 0] <- nyleuk$cases[nyleuk$cases == 0] + 0.5
+nyleuk$logcases <- log(nyleuk$cases)
+
+mod03 <- lm(data = nyleuk,
+            logcases ~ homeowners+over65+Avg.inv.dist.TCEs)
+summary(mod03)
+nyleuk$res <- resid(mod03)
+
+# Obtain empirical semi-variogram of the residuals
+emp_var2 <- variogram(res~1, locations =~ easting+northing, nyleuk, boundaries = c(15,seq(from=20,to=110,by=10)))
+emp_var2
+plot(emp_var2,col="black",type="p",pch=20, main = "Empirical Variogram")
+
+# Fit exponential semi-variogram
+exp_var2 <- fit.variogram(emp_var2,vgm(psill=0.65,"Exp",range=5,nugget=0.6),fit.method=2)
+exp_var2
+plot(emp_var2, exp_var2, main = "Exponential Semi-Variogram")
+
+sigma2.exp2 <- exp_var2$psill[2]
+phi.exp2 <- exp_var2$range[2]
+tau2.exp2 <- exp_var2$psill[1]
+
+# Fit a Poisson spatial linear mixed model
+beta.starting <- coefficients(mod02)
+beta.tuning <- 1.3*t(chol(vcov(mod02)))
+phi.starting <- 1/phi.exp2
+sigma.starting <- sigma2.exp2
+tau.starting <- tau2.exp2
+
+n.samples <- 10000
+coords <- as.matrix(cbind(nyleuk$easting, nyleuk$northing),nrow=length(nyleuk$easting),ncol=2)
+
+spatial.logist <- spGLM(nyleuk$cases ~ nyleuk$homeowners+nyleuk$over65+nyleuk$Avg.inv.dist.TCEs, family="poisson", coords=coords,
+                        starting=list("beta"=beta.starting, "phi"=phi.starting,"sigma.sq"=sigma.starting,"tau.sq"=tau.starting,
+                                      "w"=0),
+                        tuning=list("beta"=beta.tuning, "phi"=0.005, "sigma.sq"=0.005, "tau.sq"=0.01, "w"=0),
+                        priors=list("beta.Normal"=list(rep(0,4),rep(100,4)), "phi.Unif"=c(0.001,1), "sigma.sq.IG"=c(2, 1),
+                                    "tau.sq.IG"=c(2, 0.001)),
+                        n.samples=n.samples, cov.model="exponential", verbose=TRUE, n.report=100)
+
+# Trace plots of the parameters
+par(mai=rep(0.5,4))
+plot(spatial.logist$p.beta.theta.samples)
+
+
+## Here we take the burn-in to be 90% of the iterations
+burn.in <- 0.5*n.samples
+sub.samps <- burn.in:n.samples
+
+## Here we calculate the summary statistics for the samples of the
+## covariance parameters after the burn-in
+print(summary(window(spatial.logist$p.beta.theta.samples, start=burn.in)))
+
+## Here we derive the probability of having malaria.
+## For this we take the beta samples, the samples for the spatial random effects and
+## we apply the formula to compute the predicted probability in a logistic regression
+beta.hat <- spatial.logist$p.beta.theta.samples[sub.samps,1:3]
+eta.hat <- spatial.logist$p.w.samples[,sub.samps]
+p.hat <- matrix(0,dim(un.coord)[1],dim(beta.hat)[1])
+for(k in 1:dim(beta.hat)[1]){
+  p.hat[,k] <- exp(beta.hat[k,1]+beta.hat[k,2]*net.use.coord.gambia+beta.hat[k,3]*green.coord.gambia+eta.hat[,k])/(1+exp(beta.hat[k,1]+beta.hat[k,2]*net.use.coord.gambia+beta.hat[k,3]*green.coord.gambia+eta.hat[,k]))
+}
+
+## This is the estimated probability of malaria (at each location, we are taking the median
+## of the predicted probability)
+p.hat.median <- apply(p.hat,1,median)
+
+
+## Here we estimate the spatial random effects and we compute the median, and the extremes of a 95% confidence interval
+eta.post.median <- apply(eta.hat,1,median)
+eta.post.low.bd <- apply(eta.hat,1,quantile,0.025)
+eta.post.upp.bd <- apply(eta.hat,1,quantile,0.975)
+
+## This is to make a plot of the estimated spatial random effects
+surf.eta <- mba.surf(cbind(un.coord,eta.post.median),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.eta, main="Interpolated posterior median \n of spatial random effects")
+contour(surf.eta, add=TRUE)
+points(un.coord[,1], un.coord[,2],pch=19,col="black")
+
+## This is to make a plot of the lower bound of the 95% CI the estimated spatial random effects
+surf.eta.low <- mba.surf(cbind(un.coord,eta.post.low.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.eta.low, main="Interpolated lower bound of  \n 95% CI for spatial random effects",zlim=c(-3,4))
+contour(surf.eta.low, add=TRUE)
+points(un.coord[,1], un.coord[,2],pch=19,col="black")
+
+surf.eta.upp <- mba.surf(cbind(un.coord,eta.post.upp.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.eta.upp, main="Interpolated upper bound of \n of 95% CI for spatial random effects",zlim=c(-3,4))
+contour(surf.eta.upp, add=TRUE)
+points(un.coord[,1], un.coord[,2],pch=19,col="black")
+
+
+## This is to make a plot of the estimated probability of malaria
+surf.p <- mba.surf(cbind(un.coord,p.hat.median),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.p, main="Interpolated posterior median of \n probability of malaria",col=heat.colors(100)[90:1])
+contour(surf.p, add=TRUE)
+points(un.coord[,1], un.coord[,2],pch=19,col="black")
