@@ -48,7 +48,7 @@ exp_var
 plot(emp_var, exp_var, main = "Exponential Semi-Variogram")
 
 sigma2.exp <- exp_var$psill[2]
-phi.exp <- exp_var$range[2]
+phi.exp <- exp_var$range[2]/1000
 tau2.exp <- exp_var$psill[1]
 
 data.geo <- as.geodata(data50[,c(1,12,13)],coords.col=c(2,3),data.col=1)
@@ -62,8 +62,10 @@ tau2.reml <- reml.exp$tausq
 
 data20 <- data[c(52:71),]
 
-hw.control <- krige.control(type.krige="ok",trend.d="1st",trend.l="1st",cov.model = "exponential",
-                               cov.pars=c(sigma2.reml,phi.reml),nugget=tau2.reml)
+hw.control <- krige.control(type.krige="ok",trend.d=~data50$AreaL+data50$AreaO+data50$Age+data50$Bath,
+                            trend.l=~data20$AreaL+data20$AreaO+data20$Age+data20$Bath,
+                            cov.model = "exponential",
+                            cov.pars=c(sigma2.reml,phi.reml),nugget=tau2.reml)
 
 loc.hw <- matrix(c(data20$EastKM,data20$NorthKM),nrow=20,ncol=2)
 hw.pred <- krige.conv(data.geo,locations=loc.hw,krige=hw.control)
@@ -73,7 +75,7 @@ hw.pred$predict
 sqrt(sum((hw.pred$predict-data20$logSP)^2)/20)
 
 # MASE
-sum((hw.pred$predict-data20$logSP)^2)/20
+sum(abs(hw.pred$predict-data20$logSP))/20
 
 # Average of Prediction Variances
 sum(hw.pred$krige.var)/20
@@ -83,12 +85,12 @@ lower <- hw.pred$predict - 1.645*sqrt(hw.pred$krige.var)
 upper <- hw.pred$predict + 1.645*sqrt(hw.pred$krige.var)
 
 contained <- 1*(data20$logSP >= lower)&(data20$logSP <= upper)
-
+sum(contained)/20
 
 library(spBayes)
-#
+
 coords <- as.matrix(cbind(data50$EastKM, data50$NorthKM),nrow=length(data50$EastKM),ncol=2)
-beta.ini <- rep(10.2816,0.0005,0,-0.0057,0.0978)
+beta.ini <- rep(10.2256,0.0005,0,-0.0059,0.0908)
 sigma2.ini <- sigma2.reml
 tau2.ini <- tau2.reml + 0.0001
 phi.ini <- 1/phi.reml
@@ -97,7 +99,7 @@ phi.ini <- 1/phi.reml
 model.1 <- spLM(data50$logSP~data50$AreaL+data50$AreaO+data50$Age+data50$Bath, 
                 coords=coords,starting=list("phi"=phi.ini,"sigma.sq"=sigma2.ini, "tau.sq"=tau2.ini,"beta"=beta.ini),
                 tuning=list("phi"=0.001, "sigma.sq"=0.75, "tau.sq"=0.01),
-                priors=list("phi.Unif"=c(0.0001, .1), "sigma.sq.IG"=c(2, 0.06),
+                priors=list("phi.Unif"=c(0.1, 100), "sigma.sq.IG"=c(2, 0.06),
                             "tau.sq.IG"=c(2, 0.001),"beta.Flat"), cov.model="exponential",
                 n.samples=50000, verbose=TRUE, n.report=100)
 
@@ -150,13 +152,31 @@ post.pred.95ci <- apply(pred$p.y.predictive.samples,1,quantile,c(0.05,0.95))
 post.pred.95ci[,1:20]
 
 contained.pred <- 1*(data20$logSP >= post.pred.95ci[1,])&(data20$logSP <= post.pred.95ci[2,])
-
+sum(contained.pred)/20
 
 # Problem 2
 nyleuk <- read_table2("NY_Leukemia.txt")
 colnames(nyleuk) <- c("FIPS","easting","northing","pop","cases","homeowners","over65","Avg.inv.dist.TCEs","Inv.dist.nearest.TCE")
 
 # Plot
+ggplot() +
+  geom_point(data = nyleuk,
+             aes(x=easting, y = northing, color = cases)) +
+  ggtitle("Leukemia Cases in NY") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Easting (km)") +
+  ylab("Northing (km)") +
+  scale_color_gradient(name = "Number of Cases")
+
+ggplot() +
+  geom_point(data = nyleuk,
+             aes(x=easting, y = northing, color = pop)) +
+  ggtitle("Population at Each Centroid in NY") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  xlab("Easting (km)") +
+  ylab("Northing (km)") +
+  scale_color_gradient(name = "Population")
+
 ggplot() +
   geom_point(data = nyleuk,
              aes(x=easting, y = northing, color = cases, size = pop)) +
@@ -202,16 +222,19 @@ phi.starting <- 1/phi.exp2
 sigma.starting <- sigma2.exp2
 tau.starting <- tau2.exp2
 
-n.samples <- 10000
+n.batch <- 10
+batch.length <- 100
+n.samples <- n.batch*batch.length
 coords <- as.matrix(cbind(nyleuk$easting, nyleuk$northing),nrow=length(nyleuk$easting),ncol=2)
 
-spatial.logist <- spGLM(nyleuk$cases ~ nyleuk$homeowners+nyleuk$over65+nyleuk$Avg.inv.dist.TCEs, family="poisson", coords=coords,
+spatial.logist <- spGLM(nyleuk$cases ~ nyleuk$homeowners+nyleuk$over65+nyleuk$Avg.inv.dist.TCEs, family="poisson", coords=coords, weights = nyleuk$pop,
                         starting=list("beta"=beta.starting, "phi"=phi.starting,"sigma.sq"=sigma.starting,"tau.sq"=tau.starting,
                                       "w"=0),
                         tuning=list("beta"=beta.tuning, "phi"=0.005, "sigma.sq"=0.005, "tau.sq"=0.01, "w"=0),
                         priors=list("beta.Normal"=list(rep(0,4),rep(100,4)), "phi.Unif"=c(0.001,1), "sigma.sq.IG"=c(2, 1),
                                     "tau.sq.IG"=c(2, 0.001)),
-                        n.samples=n.samples, cov.model="exponential", verbose=TRUE, n.report=100)
+                        amcmc=list("n.batch"=n.batch, "batch.length"=batch.length, "accept.rate"=0.30),
+                        cov.model="exponential", verbose=TRUE, n.report=10)
 
 # Trace plots of the parameters
 par(mai=rep(0.5,4))
