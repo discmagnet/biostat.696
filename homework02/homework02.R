@@ -11,6 +11,7 @@ library(dplyr)
 library(broom)
 library(gstat)
 library(geoR)
+library(MBA)
 
 data <- read_table2("BatonRouge.txt")
 colnames(data) <- c("logSP", "AreaL", "AreaO", "Age",
@@ -119,7 +120,7 @@ model.1.other.pars <- spRecover(model.1, start=burn.in, verbose=FALSE)
 dim(model.1.other.pars$p.beta.recover.samples)
 
 par(mai=rep(0.4,4),mfrow=c(2,2))
-plot(model.1.other.pars$p.beta.recover.samples[,1:4])
+plot(model.1.other.pars$p.beta.recover.samples[,1:5])
 
 par(mai=rep(0.4,4))
 plot(model.1.other.pars$p.beta.recover.samples[,5])
@@ -147,7 +148,7 @@ dim(pred$p.y.predictive.samples)
 post.pred.mean <- rowMeans(pred$p.y.predictive.samples)
 post.pred.mean[1:20]
 
-## Here we compute the 95% posterior predictive intervals at the 237 sites
+## Here we compute the 90% posterior predictive intervals at the 237 sites
 post.pred.95ci <- apply(pred$p.y.predictive.samples,1,quantile,c(0.05,0.95))
 post.pred.95ci[,1:20]
 
@@ -207,7 +208,7 @@ emp_var2
 plot(emp_var2,col="black",type="p",pch=20, main = "Empirical Variogram")
 
 # Fit exponential semi-variogram
-exp_var2 <- fit.variogram(emp_var2,vgm(psill=0.65,"Exp",range=5,nugget=0.6),fit.method=2)
+exp_var2 <- fit.variogram(emp_var2,vgm(psill=0.05,"Exp",range=5,nugget=0.6),fit.method=2)
 exp_var2
 plot(emp_var2, exp_var2, main = "Exponential Semi-Variogram")
 
@@ -217,24 +218,23 @@ tau2.exp2 <- exp_var2$psill[1]
 
 # Fit a Poisson spatial linear mixed model
 beta.starting <- coefficients(mod02)
-beta.tuning <- 1.3*t(chol(vcov(mod02)))
+beta.tuning <- 5*t(chol(vcov(mod02)))
 phi.starting <- 1/phi.exp2
 sigma.starting <- sigma2.exp2
 tau.starting <- tau2.exp2
 
-n.batch <- 10
+n.batch <- 50
 batch.length <- 100
 n.samples <- n.batch*batch.length
 coords <- as.matrix(cbind(nyleuk$easting, nyleuk$northing),nrow=length(nyleuk$easting),ncol=2)
 
 spatial.logist <- spGLM(nyleuk$cases ~ nyleuk$homeowners+nyleuk$over65+nyleuk$Avg.inv.dist.TCEs, family="poisson", coords=coords, weights = nyleuk$pop,
-                        starting=list("beta"=beta.starting, "phi"=phi.starting,"sigma.sq"=sigma.starting,"tau.sq"=tau.starting,
-                                      "w"=0),
-                        tuning=list("beta"=beta.tuning, "phi"=0.005, "sigma.sq"=0.005, "tau.sq"=0.01, "w"=0),
+                        starting=list("beta"=beta.starting, "phi"=phi.starting,"sigma.sq"=sigma.starting,"w"=0),
+                        tuning=list("beta"=beta.tuning, "phi"=0.6, "sigma.sq"=0.3,"w"=0.5),
                         priors=list("beta.Normal"=list(rep(0,4),rep(100,4)), "phi.Unif"=c(0.001,1), "sigma.sq.IG"=c(2, 1),
                                     "tau.sq.IG"=c(2, 0.001)),
                         amcmc=list("n.batch"=n.batch, "batch.length"=batch.length, "accept.rate"=0.30),
-                        cov.model="exponential", verbose=TRUE, n.report=10)
+                        cov.model="exponential", verbose=TRUE, n.report=1)
 
 # Trace plots of the parameters
 par(mai=rep(0.5,4))
@@ -252,17 +252,7 @@ print(summary(window(spatial.logist$p.beta.theta.samples, start=burn.in)))
 ## Here we derive the probability of having malaria.
 ## For this we take the beta samples, the samples for the spatial random effects and
 ## we apply the formula to compute the predicted probability in a logistic regression
-beta.hat <- spatial.logist$p.beta.theta.samples[sub.samps,1:3]
 eta.hat <- spatial.logist$p.w.samples[,sub.samps]
-p.hat <- matrix(0,dim(un.coord)[1],dim(beta.hat)[1])
-for(k in 1:dim(beta.hat)[1]){
-  p.hat[,k] <- exp(beta.hat[k,1]+beta.hat[k,2]*net.use.coord.gambia+beta.hat[k,3]*green.coord.gambia+eta.hat[,k])/(1+exp(beta.hat[k,1]+beta.hat[k,2]*net.use.coord.gambia+beta.hat[k,3]*green.coord.gambia+eta.hat[,k]))
-}
-
-## This is the estimated probability of malaria (at each location, we are taking the median
-## of the predicted probability)
-p.hat.median <- apply(p.hat,1,median)
-
 
 ## Here we estimate the spatial random effects and we compute the median, and the extremes of a 95% confidence interval
 eta.post.median <- apply(eta.hat,1,median)
@@ -270,25 +260,19 @@ eta.post.low.bd <- apply(eta.hat,1,quantile,0.025)
 eta.post.upp.bd <- apply(eta.hat,1,quantile,0.975)
 
 ## This is to make a plot of the estimated spatial random effects
-surf.eta <- mba.surf(cbind(un.coord,eta.post.median),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.eta, main="Interpolated posterior median \n of spatial random effects")
+surf.eta <- mba.surf(cbind(coords,eta.post.median),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.eta, main="Interpolated posterior median \n of spatial random effects",zlim=c(-2.5,-0.5))
 contour(surf.eta, add=TRUE)
-points(un.coord[,1], un.coord[,2],pch=19,col="black")
+points(coords[,1],coords[,2],pch=19,col="black")
 
 ## This is to make a plot of the lower bound of the 95% CI the estimated spatial random effects
-surf.eta.low <- mba.surf(cbind(un.coord,eta.post.low.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.eta.low, main="Interpolated lower bound of  \n 95% CI for spatial random effects",zlim=c(-3,4))
+surf.eta.low <- mba.surf(cbind(coords,eta.post.low.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.eta.low, main="Interpolated lower bound of  \n 95% CI for spatial random effects",zlim=c(-2.5,-0.5))
 contour(surf.eta.low, add=TRUE)
-points(un.coord[,1], un.coord[,2],pch=19,col="black")
+points(coords[,1],coords[,2],pch=19,col="black")
 
-surf.eta.upp <- mba.surf(cbind(un.coord,eta.post.upp.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.eta.upp, main="Interpolated upper bound of \n of 95% CI for spatial random effects",zlim=c(-3,4))
+## This is to make a plot of the upper bound of the 95% CI the estimated spatial random effects
+surf.eta.upp <- mba.surf(cbind(coords,eta.post.upp.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
+image.plot(surf.eta.upp, main="Interpolated upper bound of \n 95% CI for spatial random effects",zlim=c(-2.5,-0.5))
 contour(surf.eta.upp, add=TRUE)
-points(un.coord[,1], un.coord[,2],pch=19,col="black")
-
-
-## This is to make a plot of the estimated probability of malaria
-surf.p <- mba.surf(cbind(un.coord,p.hat.median),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.p, main="Interpolated posterior median of \n probability of malaria",col=heat.colors(100)[90:1])
-contour(surf.p, add=TRUE)
-points(un.coord[,1], un.coord[,2],pch=19,col="black")
+points(coords[,1],coords[,2],pch=19,col="black")
