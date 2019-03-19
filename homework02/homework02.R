@@ -148,6 +148,19 @@ dim(pred$p.y.predictive.samples)
 post.pred.mean <- rowMeans(pred$p.y.predictive.samples)
 post.pred.mean[1:20]
 
+# RMSE
+sqrt(sum((post.pred.mean-data20$logSP)^2)/20)
+
+# MASE
+sum(abs(post.pred.mean-data20$logSP))/20
+
+# Average of Prediction Variances
+varsum <- 0
+for(i in 1:20){
+  varsum <- varsum + var(pred$p.y.predictive.samples[i,])
+}
+varsum/20
+
 ## Here we compute the 90% posterior predictive intervals at the 237 sites
 post.pred.95ci <- apply(pred$p.y.predictive.samples,1,quantile,c(0.05,0.95))
 post.pred.95ci[,1:20]
@@ -189,7 +202,7 @@ ggplot() +
 
 # Fit Poisson Log-Linear Model
 mod02 <- glm(data = nyleuk,
-             cases ~ homeowners+over65+Avg.inv.dist.TCEs,
+             cases ~ homeowners+over65+Avg.inv.dist.TCEs+offset(log(pop)),
              family = "poisson")
 summary(mod02)
 
@@ -223,7 +236,7 @@ phi.starting <- 1/phi.exp2
 sigma.starting <- sigma2.exp2
 tau.starting <- tau2.exp2
 
-n.batch <- 50
+n.batch <- 1000
 batch.length <- 100
 n.samples <- n.batch*batch.length
 coords <- as.matrix(cbind(nyleuk$easting, nyleuk$northing),nrow=length(nyleuk$easting),ncol=2)
@@ -261,18 +274,18 @@ eta.post.upp.bd <- apply(eta.hat,1,quantile,0.975)
 
 ## This is to make a plot of the estimated spatial random effects
 surf.eta <- mba.surf(cbind(coords,eta.post.median),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.eta, main="Interpolated posterior median \n of spatial random effects",zlim=c(-2.5,-0.5))
+image.plot(surf.eta, main="Interpolated posterior median \n of spatial random effects",zlim=c(-1,1.2))
 contour(surf.eta, add=TRUE)
 points(coords[,1],coords[,2],pch=19,col="black")
 
 ## This is to make a plot of the lower bound of the 95% CI the estimated spatial random effects
 surf.eta.low <- mba.surf(cbind(coords,eta.post.low.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.eta.low, main="Interpolated lower bound of  \n 95% CI for spatial random effects",zlim=c(-2.5,-0.5))
+image.plot(surf.eta.low, main="Interpolated lower bound of  \n 95% CI for spatial random effects",zlim=c(-1,1.2))
 contour(surf.eta.low, add=TRUE)
 points(coords[,1],coords[,2],pch=19,col="black")
 
 ## This is to make a plot of the upper bound of the 95% CI the estimated spatial random effects
 surf.eta.upp <- mba.surf(cbind(coords,eta.post.upp.bd),no.X=100, no.Y=100, extend=TRUE)$xyz.est
-image.plot(surf.eta.upp, main="Interpolated upper bound of \n 95% CI for spatial random effects",zlim=c(-2.5,-0.5))
+image.plot(surf.eta.upp, main="Interpolated upper bound of \n 95% CI for spatial random effects",zlim=c(-1,1.2))
 contour(surf.eta.upp, add=TRUE)
 points(coords[,1],coords[,2],pch=19,col="black")
