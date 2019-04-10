@@ -83,7 +83,7 @@ points(un.x.soil,median.water.x,pch=20,col="red")
 legend("topright",pch=rep(20,2),col=c("black","red"),c("Mean","Median"))
 
 plot(un.y.soil,mean.water.y,type="p",col="black",pch=20,
-ylim=range(c(mean.water.y,median.water.y)),,main="Plot of the mean/median of Y(s_i) versus the y coordinate",
+ylim=range(c(mean.water.y,median.water.y)),main="Plot of the mean/median of Y(s_i) versus the y coordinate",
 xlab="Y",ylab="pH of Water")
 points(un.y.soil,median.water.y,pch=20,col="red")
 legend("topright",pch=rep(20,2),col=c("black","red"),c("Mean","Median"))
