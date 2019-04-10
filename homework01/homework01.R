@@ -90,7 +90,7 @@ data$X3 <- (data$X)^3
 data$Y3 <- (data$Y)^3
 
 mod01 <- lm(data = data,
-            obs ~ CMAQ+X+Y+Z+X2+Y2+XY+XZ+YZ+X2Y+XY2+X2Z+Y2Z+X3+Y3)
+            obs ~ CMAQ+X+Y+Z+X2+Y2+XY)
 summary(mod01)
 mod01_coeff <- summary(mod01)$coeff[1:14]
 data$res <- mod01$residuals
@@ -121,19 +121,19 @@ plot(dir.NW$dist,dir.NW$gamma,col="black",type="p",pch=20,xlab="Distance",ylab="
      main = "NW-SE Empirical Directional Variogram", ylim=c(0,300))
 
 # Fit Exponential Semi-Variogram
-exp_var <- fit.variogram(emp_var,vgm(psill=150,"Exp",500,100),fit.method=2)
+exp_var <- fit.variogram(emp_var,vgm(psill=150,"Exp",range=500,nugget=100),fit.method=2)
 exp_var
 plot(emp_var, exp_var, main = "Exponential Semi-Variogram")
 # Fit Gaussian Semi-Variogram
-gau_var <- fit.variogram(emp_var,vgm(psill=150,"Gau",500,100),fit.method=2)
+gau_var <- fit.variogram(emp_var,vgm(psill=150,"Gau",range=500,nugget=100),fit.method=2)
 gau_var
 plot(emp_var, gau_var, main = "Gaussian Semi-Variogram")
 # Fit Spherical Semi-Variogram
-sph_var <- fit.variogram(emp_var,vgm(psill=150,"Sph",500,100),fit.method=2)
+sph_var <- fit.variogram(emp_var,vgm(psill=150,"Sph",range=500,nugget=100),fit.method=2)
 sph_var
 plot(emp_var, sph_var, main = "Spherical Semi-Variogram")
 # Fit Matern Semi-Variogram
-mat_var <- fit.variogram(emp_var,vgm(psill=150,"Mat",500,100,1.5),fit.method=2)
+mat_var <- fit.variogram(emp_var,vgm(psill=150,"Mat",range=500,nugget=100,kappa=1.5),fit.method=2)
 mat_var
 plot(emp_var, mat_var, main = "Matern Semi-Variogram")
 
