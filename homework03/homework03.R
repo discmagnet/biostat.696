@@ -213,7 +213,7 @@ leg.txt<-c("[-0.17, 0.01)","[0.01, 0.11)","[0.11, 0.24)","[0.24, 0.53]")
 legend(x=-75,y=40,legend=leg.txt,fill=plotclr,cex=1,ncol=1,bty="n")
 plotvar <- -1*(up.bd95ci.eta < 0) + 1*(low.bd95ci.eta > 0)
 nclr <- 3
-plotclr <- brewer.pal(nclr,"RdBu")
+plotclr <- brewer.pal(nclr,"RdBu")[3:1]
 class <- classIntervals(plotvar,nclr,style="fixed",fixedBreaks=c(-1.5,-0.5,0.5,1.5),length=nclr+1)
 class
 colcode <- findColours(class,plotclr)
